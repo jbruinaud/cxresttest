@@ -9,10 +9,10 @@ _cxserver="http://jbcxvm"
 _cxlastscanmaxage=90
 _output=stats.csv
 
-#### Building output file header
+#### Building output csv file header
 echo "Project name,LOC,Scan date,Scan origin" > $_output
 
-#### Let's first get an authentication token
+#### Get an authentication token
 _cxtoken=$(curl -s -X POST \
 ${_cxserver}/cxrestapi/auth/identity/connect/token \
 -H 'Accept: application/json;v=1.0' \
@@ -22,7 +22,7 @@ ${_cxserver}/cxrestapi/auth/identity/connect/token \
 
 #echo auth_token $_cxtoken
 
-#### Then let's get the team id
+#### Get the team id
 #_cxteamid=$(curl -s -X GET \
 #http://${_cxserver}/cxrestapi/auth/teams \
 #-H 'Accept: application/json;v=1.0' \
@@ -38,7 +38,7 @@ ${_cxserver}/cxrestapi/projects \
 | jq -r '.[].id')
 do
 	#echo projectid $_cxprojectid
-	#### Get project last finished scan
+	#### Get last finished scan
 	_cxprojscan=$(curl -s -X GET "${_cxserver}/cxrestapi/sast/scans?projectId=${_cxprojectid}&scanStatus=7&last=1" -H 'Accept: application/json;v=1.0' -H "Authorization: Bearer ${_cxtoken}")
 	#### Get scan date
 	_cxlastscandate=$(echo $_cxprojscan | jq -r ' .[].dateAndTime.startedOn ')
@@ -47,19 +47,19 @@ do
 	then
 		echo No finished scan found for project $_cxprojectid
 	else
-		#### Checking date validity
+		#### Check date validity
 		_cxlastscandatestr=${_cxlastscandate:0:10}
 		if [ $(date -d $_cxlastscandatestr +"%s") -lt $(expr $(date "+%s") - $(expr 86400 \* $_cxlastscanmaxage) ) ]
 		then
 			echo "Last finished scan too old for project $_cxprojectid : $_cxlastscandate (>$_cxlastscanmaxage days)"
 		else
-			#### Processing valid last scan
+			#### Process valid last scan
 			echo Processing project $_cxprojectid
 			_rprojname=$(echo $_cxprojscan | jq -r ' .[].project.name ')
 			_rscanloc=$(echo $_cxprojscan | jq -r ' .[].scanState.linesOfCode')
 			_rscandate=$_cxlastscandatestr
 			_rscanorigin=$(echo $_cxprojscan | jq -r ' .[].origin')
-			#### Output
+			#### Add a record to the csv file
 			echo "${_rprojname},${_rscanloc},${_rscandate},${_rscanorigin}" >> $_output
 		fi
 	fi
